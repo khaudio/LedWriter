@@ -1,0 +1,20 @@
+{
+    "name": "LedWriter",
+    "keywords": "led, light, rgb",
+    "description": "Effects framework for granular color control of RGB LEDs connected to ESP32 and ESP8266 devices.",
+    "repository":
+    {
+        "type": "git",
+        "url": "https://github.com/khaudio/LedWriter.git"
+    },
+    "version": "0.1.0",
+    "frameworks": "arduino",
+    "platforms": "espressif8266, espressif32",
+    "authors":
+    [
+        {
+            "name": "Kyle Hughes",
+            "maintainer": true
+        }
+    ]
+}
