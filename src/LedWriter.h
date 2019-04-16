@@ -74,6 +74,8 @@ class LedWriter : public SimpleSerialBase {
         void setMax(uint16_t);
         void setMin(uint16_t, uint16_t, uint16_t);
         void setMin(uint16_t);
+        std::array<uint16_t, 3> getMax();
+        std::array<uint16_t, 3> getMin();
         void set(std::array<uint16_t, 3>, bool immediate=false);
         void set(uint16_t, uint16_t, uint16_t, bool immediate=false);
         Effect* createEffect(
@@ -90,10 +92,10 @@ class LedWriter : public SimpleSerialBase {
             );
         void alignEffects();
         void write();
-        void overwrite(std::array<uint16_t, 3>, bool save=true);
-        void overwrite(uint16_t, uint16_t, uint16_t, bool save=true);
+        void overwrite(std::array<uint16_t, 3>);
+        void overwrite(uint16_t, uint16_t, uint16_t);
         void save(bool global=false);
-        void recall(bool global=false, bool immediate=true);
+        std::array<uint16_t, 3> recall(bool global=false, bool apply=true, bool immediate=true);
         std::array<uint16_t, 3> full(bool immediate=true);
         std::array<uint16_t, 3> clear(bool immediate=true);
         std::array<uint16_t, 3> primary(uint8_t, uint16_t value=0);
@@ -102,13 +104,17 @@ class LedWriter : public SimpleSerialBase {
         std::array<uint16_t, 3> getTarget();
         std::array<uint16_t, 3> getColorInversion(std::array<uint16_t, 3>);
         std::array<uint16_t, 3> getColorInversion();
+        bool illuminated();
+        bool isMax(bool absolute=false);
+        bool isMin();
+        bool isColor(std::array<uint16_t, 3>);
+        bool isColor(uint16_t, uint16_t, uint16_t);
         void invert();
         void increment(std::array<int32_t, 3>, bool immediate=true);
         void increment(
                 int32_t redValue=1, int32_t greenValue=1, int32_t blueValue=1,
                 bool immediate=true
             );
-        bool illuminated();
         void updateTimers(uint32_t delta);
         bool updateClock(uint32_t* currentTime=nullptr, bool adjust=false);
         uint32_t effectsQueued();
@@ -120,9 +126,15 @@ class LedWriter : public SimpleSerialBase {
         Effect* lastEffect();
         void cycleEffects();
         void clearEffects(bool cancel=true);
-        void hold(double, double timeIndex=1, bool all=false);
+        void hold(double=0.5, double timeIndex=1, bool all=false);
+        void holdLast(double=0.5, double timeIndex=1);
         void resume();
-        void bounce();
+        bool bounceFlash(
+                std::array<uint16_t, 3>, std::array<uint16_t, 3>,
+                double fadeDuration=0, double holdDuration=0
+            );
+        bool bounce(double fadeDuration=0, double holdDuration=0);
+        bool blink(double fadeDuration=0, double holdDuration=0);
         void rotate(double duration=0);
         void cycle(double duration=0);
         void test(double duration=1.5);

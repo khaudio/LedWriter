@@ -34,13 +34,13 @@ class ColorChannel : public SimpleSerialBase {
         bool verbose = false, inverted = false;
         double frequency, steps, stepSize;
         uint8_t pin, channel, resolution, scale = 1;
-        uint16_t value, target, absoluteMaximum, maximum, minimum = 0, last = 0, offset = 0;
+        uint16_t value, target, last, absoluteMaximum, maximum, minimum = 0, offset = 0;
         uint16_t* color = &value;
         uint32_t delta, lastRounded;
         ColorChannel(uint8_t pin, uint8_t channel, uint8_t resolution=8, double frequency=0);
         ~ColorChannel();
         void write();
-        void overwrite(uint16_t val, bool save=true);
+        void overwrite(uint16_t val);
         uint16_t conformAbsolute(uint16_t);
         uint16_t conform(uint16_t);
         uint16_t getColorInversion();

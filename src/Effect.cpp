@@ -69,21 +69,25 @@ void Hold::status() {
         }
 }
 
-bool Hold::step(uint32_t elapsed, uint32_t stepsRemaining) {
+bool Hold::step(uint32_t stepsRemaining) {
     // Return true if hold is active
     if (!this->active && (stepsRemaining <= this->threshold)) {
         this->active = true;
         if (this->verbose) {
             Serial.printf(
-                    "\t\tActivating hold with threshold %u with %u steps remaining\n",
-                    this->threshold, stepsRemaining
+                    "\t\tActivating hold with threshold %u with %u effect steps remaining for %f seconds\n",
+                    this->threshold, stepsRemaining, this->remaining * 1e-6
                 );
         }
+        this->last = micros();
     }
     if (this->active) {
         // Subtract elapsed microseconds from remaining hold time
-        this->remaining -= elapsed;
+        uint32_t now = micros();
+        this->remaining -= (now - this->last);
+        this->last = now;
         if (this->remaining <= 0){
+            print("\t\tDeactivating hold");
             this->active = false;
             this->complete = true;
         }
@@ -234,7 +238,7 @@ void Effect::hold(double durationInSeconds, double timeIndex) {
         print("\tInsufficient memory for hold creation");
         return;
     }
-    Hold* created = new Hold(durationInSeconds);
+    Hold* created = new Hold(durationInSeconds, timeIndex);
     created->verbose = this->verbose;
     this->holds.push_back(created);
 }
@@ -317,7 +321,7 @@ uint32_t Effect::getSteps() {
     return this->stepsRemaining;
 }
 
-bool Effect::holding(uint32_t elapsed) {
+bool Effect::holding() {
     // Process holds and return whether a hold is active
     if (!this->holds.empty()) {
         Hold* current = this->holds.front();
@@ -333,7 +337,7 @@ bool Effect::holding(uint32_t elapsed) {
                 current->init(this->totalSteps);
             }
         } else {
-            if (current->step(elapsed, this->stepsRemaining)) {
+            if (current->step(this->stepsRemaining)) {
                 this->last = *this->now;
                 return true;
             }
@@ -345,7 +349,7 @@ bool Effect::holding(uint32_t elapsed) {
 void Effect::step() {
     // Measures elapsed time and compensates
     uint32_t elapsed = micros() - this->last;
-    if (elapsed && !holding(elapsed) && (this->stepsRemaining > 0)) {
+    if (elapsed && !holding() && (this->stepsRemaining > 0)) {
         int64_t iterations = elapsed / this->stepLength;
         if (iterations >= 1) {
             iterations = (iterations <= this->stepsRemaining ? iterations : this->stepsRemaining);

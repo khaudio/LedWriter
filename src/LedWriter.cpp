@@ -147,6 +147,22 @@ void LedWriter::setMin(uint16_t redMin, uint16_t greenMin, uint16_t blueMin) {
     }
 }
 
+std::array<uint16_t, 3> LedWriter::getMax() {
+    std::array<uint16_t, 3> softMaximum;
+    for (int i = 0; i < 3; i++) {
+        softMaximum[i] = this->channels[i]->maximum;
+    }
+    return softMaximum;
+}
+
+std::array<uint16_t, 3> LedWriter::getMin() {
+    std::array<uint16_t, 3> softMinimum;
+    for (int i = 0; i < 3; i++) {
+        softMinimum[i] = this->channels[i]->minimum;
+    }
+    return softMinimum;
+}
+
 void LedWriter::set(std::array<uint16_t, 3> values, bool immediate) {
     if (immediate) {
         clearEffects();
@@ -248,16 +264,16 @@ void LedWriter::write() {
     print("Applied");
 }
 
-void LedWriter::overwrite(std::array<uint16_t, 3> values, bool save) {
+void LedWriter::overwrite(std::array<uint16_t, 3> values) {
     for (int i = 0; i < 3; i++) {
-        this->channels[i]->overwrite(values[i], save);
+        this->channels[i]->overwrite(values[i]);
     }
     print("Overwritten");
 }
 
-void LedWriter::overwrite(uint16_t redValue, uint16_t greenValue, uint16_t blueValue, bool save) {
+void LedWriter::overwrite(uint16_t redValue, uint16_t greenValue, uint16_t blueValue) {
     std::array<uint16_t, 3> values = {redValue, greenValue, blueValue};
-    overwrite(values, save);
+    overwrite(values);
 }
 
 void LedWriter::increment(std::array<int32_t, 3> values, bool immediate) {
@@ -285,15 +301,20 @@ void LedWriter::save(bool global) {
     print("Saved");
 }
 
-void LedWriter::recall(bool global, bool immediate) {
+std::array<uint16_t, 3> LedWriter::recall(bool global, bool apply, bool immediate) {
+    std::array<uint16_t, 3> recalled;
     if (global) {
-        set(this->globalSave->recall(), immediate);
+        recalled = this->globalSave->recall();
         this->globalSave->clear();
     } else {
-        for (auto channel: this->channels) {
-            channel->recall(immediate);
+        for (int i = 0; i < 3; i++) {
+            recalled[i] = this->channels[i]->last;
         }
     }
+    if (apply) {
+        set(recalled, immediate);
+    }
+    return recalled;
     print("Recalled");
 }
 
@@ -381,18 +402,52 @@ std::array<uint16_t, 3> LedWriter::getColorInversion() {
     return inverted;
 }
 
-void LedWriter::invert() {
-    print("Inverting current values");
-    set(getColorInversion());
-}
-
 bool LedWriter::illuminated() {
+    // Whether any channel values are on
     for (auto color: this->color) {
         if (*color) {
             return true;
         }
     }
     return false;
+}
+
+bool LedWriter::isMax(bool absolute) {
+    // Whether all channels are at maximum value
+    for (auto channel: this->channels) {
+        if (channel->value != (absolute ? channel->absoluteMaximum : channel->maximum)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LedWriter::isMin() {
+    // Whether all channels are at minimum value
+    for (auto channel: this->channels) {
+        if (channel->value != channel->minimum) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LedWriter::isColor(std::array<uint16_t, 3> target) {
+    for (int i = 0; i < 3; i++) {
+        if (*(this->color[i]) != target[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LedWriter::isColor(uint16_t red, uint16_t green, uint16_t blue) {
+    return isColor(std::array<uint16_t, 3>{red, green, blue});
+}
+
+void LedWriter::invert() {
+    print("Inverting current values");
+    set(getColorInversion());
 }
 
 bool LedWriter::updateClock(uint32_t* currentTime, bool adjust) {
@@ -454,7 +509,7 @@ void LedWriter::updateEffects(std::array<uint16_t, 3> target) {
     for (auto effect: this->effects) {
         effect->target = target;
     }
-    overwrite(target, true);
+    overwrite(target);
     skipEffect();
 }
 
@@ -472,7 +527,7 @@ void LedWriter::cycleEffects() {
             this->lastUID = this->effect->uid;
             this->lastCompletion = this->now;
             if (this->globalSave->recallInquiry(this->effect->uid)) {
-                recall(true, true);
+                recall(true, true, true);
             }
             if (this->effect != nullptr) {
                 if (this->effect->loop != 0) {
@@ -546,6 +601,17 @@ void LedWriter::hold(double seconds, double timeIndex, bool all) {
     }
 }
 
+void LedWriter::holdLast(double seconds, double timeIndex) {
+    /*
+        Holds active effect when fade is completed.
+        Creates an effect with current color if none are queued.
+    */
+    if (effectsQueued()) {
+        print("Setting hold on last queued effect");
+        this->effects.back()->hold(seconds, timeIndex);
+    }
+}
+
 void LedWriter::resume() {
     // Resumes effect if one is active
     if (effectsQueued()) {
@@ -553,19 +619,70 @@ void LedWriter::resume() {
     }
 }
 
-void LedWriter::bounce() {
-    // Inverts colors when no effects are queued; non-blocking.
+bool LedWriter::bounceFlash(
+        std::array<uint16_t, 3> first, std::array<uint16_t, 3> second,
+        double fadeDuration, double holdDuration
+    ) {
+    // Flashes between two colors when no effects are queued; non-blocking.
     if (!effectsQueued()) {
-        set(getColorInversion());
+        std::array<uint16_t, 3> target;
+        if (isColor(first)) {
+            target = second;
+        } else {
+            target = first;
+        }
+        createEffect(target, (fadeDuration <= 1e-6 ? 1e-6 : fadeDuration / 2));
+        if (holdDuration) {
+            holdLast(holdDuration, 1);
+        }
+        return true;
     }
+    return false;
+}
+
+bool LedWriter::bounce(double fadeDuration, double holdDuration) {
+    // Inverts color when no effects are queued; non-blocking.
+    if (!effectsQueued()) {
+        if (!fadeDuration) {
+            fadeDuration = this->globalEffectDuration;
+        }
+        createEffect(getColorInversion(), (fadeDuration <= 1e-6 ? 1e-6 : fadeDuration / 2));
+        if (holdDuration) {
+            holdLast(holdDuration, 1);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool LedWriter::blink(double fadeDuration, double holdDuration) {
+    // Clears or recalls color when no effects are queued; non-blocking.
+    if (!effectsQueued()) {
+        std::array<uint16_t, 3> target;
+        if (!fadeDuration) {
+            fadeDuration = this->globalEffectDuration;
+        }
+        if (!isMin()) {
+            save(false);
+            target = getMin();
+        } else {
+            target = recall(false, false, false);
+        }
+        createEffect(target, (fadeDuration <= 1e-6 ? 1e-6 : fadeDuration / 2));
+        if (holdDuration) {
+            holdLast(holdDuration, 1);
+        }
+        return true;
+    }
+    return false;
 }
 
 void LedWriter::rotate(double duration) {
     // Cycles RYGCBM once; non-blocking.  Duration sets length of one full cycle.
     double divided = (duration ? duration : this->globalEffectDuration) / 6;
-    for (int i = 0; i < 6; i += 2) {
-        createEffect(primary(i), divided, false, 0, 0, 0, i, false, 0);
-        createEffect(secondary(i), divided,  false, 0, 0, 0, i + 1, false, 0);
+    for (int i = 0, j = 0; i < 3; i++, j += 2) {
+        createEffect(primary(i), divided, false, 0, 0, 0, j, false, 0);
+        createEffect(secondary(i), divided,  false, 0, 0, 0, j + 1, false, 0);
     }
 }
 

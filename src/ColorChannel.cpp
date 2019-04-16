@@ -32,10 +32,15 @@ ColorChannel::ColorChannel(uint8_t pin, uint8_t channel, uint8_t resolution, dou
     this->resolution = (resolution >= 1 && resolution <= 15 ? resolution : 8);
     double maxFrequency = (80000000 / std::pow(2, resolution));
     this->frequency = (frequency <= 0 || (frequency > maxFrequency)) ? maxFrequency : frequency;
-    pinMode(this->pin, OUTPUT);
-    ledcAttachPin(this->pin, this->channel);
-    ledcSetup(this->channel, this->frequency, this->resolution); // ledcSetup denotes 0-15 for bits 1-16 but debugging suggests otherwise
+    #if ESP32 || ESP8266
+        pinMode(this->pin, OUTPUT);
+        ledcAttachPin(this->pin, this->channel);
+        ledcSetup(this->channel, this->frequency, this->resolution); // ledcSetup denotes 0-15 for bits 1-16 but debugging suggests otherwise
+    #elif __AVR__
+        pinMode(this->pin, OUTPUT);
+    #endif
     set(this->maximum, true);
+    this->target = this->value;
     save();
 }
 
@@ -45,14 +50,24 @@ ColorChannel::~ColorChannel() {
 }
 
 void ColorChannel::write() {
-    ledcWrite(this->channel, (this->inverted ? getColorInversion() : this->value));
+    #if ESP32 || ESP8266
+        ledcWrite(this->channel, (this->inverted ? getColorInversion() : this->value));
+    #elif __AVR__
+        analogWrite(this->channel, (this->inverted ? getColorInversion() : this->value));
+    #else
+        ;
+    #endif
 }
 
-void ColorChannel::overwrite(uint16_t val, bool save) {
-    if (save) {
-        this->value = val;
-    }
-    ledcWrite(this->channel, val);
+void ColorChannel::overwrite(uint16_t val) {
+    this->value = val;
+    #if ESP32 || ESP8266
+        ledcWrite(this->channel, val);
+    #elif __AVR__
+        analogWrite(this->channel, val);
+    #else
+        ;
+    #endif
 }
 
 uint16_t ColorChannel::conformAbsolute(uint16_t val) {

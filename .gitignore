@@ -1,3 +1,4 @@
+.DS_Store
 .pio
 .pioenvs
 .piolibdeps
@@ -5,3 +6,5 @@
 .gcc-flags.json
 .vscode
 .travis.yml
+tempCodeRunnerFile.h
+sftp.json

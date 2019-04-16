@@ -32,13 +32,13 @@ class Hold : public SimpleSerialBase {
     public:
         bool active = false, complete = false, verbose = false;
         double start = 1; // 0 - 1 amount of effect completed to trigger hold
-        uint32_t threshold = 0; // Descending effect step count to activate
+        uint32_t last, threshold = 0; // Descending effect step count to activate
         int64_t duration, remaining = 0;
         Hold(double, double startThreshold=1);
         ~Hold();
         void init(uint32_t);
         void status();
-        bool step(uint32_t, uint32_t);
+        bool step(uint32_t);
 };
 
 class Effect : public SimpleSerialBase {
@@ -82,7 +82,7 @@ class Effect : public SimpleSerialBase {
         void resume();
         void clearHolds();
         uint32_t getSteps();
-        bool holding(uint32_t);
+        bool holding();
         void step();
         bool run();
         void status();
