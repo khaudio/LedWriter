@@ -228,32 +228,10 @@ int16_t Effect::vary(int32_t boundary, uint32_t& var) {
 }
 
 void Effect::varyStart(int32_t boundary) {
-    // if (!boundary) {
-    //     return;
-    // }
-    // srand(micros());
-    // int16_t variance = rand();
-    // if (abs(variance) < boundary && (
-    //         (this->start + variance) > *this->now
-    //     )) {
-    //     this->start += variance;
-    //     this->end += variance;
-    // }
     this->end += vary(boundary, this->start);
 }
 
 void Effect::varyDuration(int32_t boundary) {
-    // if (!boundary) {
-    //     return;
-    // }
-    // srand(micros());
-    // int16_t variance = rand();
-    // if (abs(variance) < boundary && (
-    //         (this->start + variance) > *this->now
-    //     )) {
-    //     this->duration += variance;
-    //     this->end = this->start + this->duration;
-    // }
     vary(boundary, this->duration);
     this->end = this->start + this->duration;
 }
