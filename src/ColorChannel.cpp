@@ -24,18 +24,27 @@
 
 #include "ColorChannel.h"
 
-ColorChannel::ColorChannel(uint8_t pin, uint8_t channel, uint8_t resolution, double frequency) {
+ColorChannel::ColorChannel(
+        uint8_t pin,
+        uint8_t channel,
+        uint8_t resolution,
+        double frequency
+    ) {
     this->pin = pin;
     this->absoluteMaximum = (std::pow(2, resolution) - 1);
     this->maximum = this->absoluteMaximum;
     this->channel = channel;
     this->resolution = (resolution >= 1 && resolution <= 15 ? resolution : 8);
     double maxFrequency = (80000000 / std::pow(2, resolution));
-    this->frequency = (frequency <= 0 || (frequency > maxFrequency)) ? maxFrequency : frequency;
+    this->frequency = (
+            frequency <= 0 || (frequency > maxFrequency)
+        ) ? maxFrequency : frequency;
     #if ESP32 || ESP8266
         pinMode(this->pin, OUTPUT);
         ledcAttachPin(this->pin, this->channel);
-        ledcSetup(this->channel, this->frequency, this->resolution); // ledcSetup denotes 0-15 for bits 1-16 but debugging suggests otherwise
+        /* ledcSetup denotes 0-15 for bits 1-16,
+        but only 0-14 appear to work properly. */
+        ledcSetup(this->channel, this->frequency, this->resolution);
     #elif __AVR__
         pinMode(this->pin, OUTPUT);
     #endif
@@ -46,16 +55,20 @@ ColorChannel::ColorChannel(uint8_t pin, uint8_t channel, uint8_t resolution, dou
 
 ColorChannel::~ColorChannel() {
     this->color = nullptr;
-    ledcDetachPin(this->pin);
+    #if ESP32 || ESP8266
+        ledcDetachPin(this->pin);
+    #endif
 }
 
 void ColorChannel::write() {
     #if ESP32 || ESP8266
-        ledcWrite(this->channel, (this->inverted ? getColorInversion() : this->value));
+        ledcWrite(this->channel, (
+                this->inverted ? getColorInversion() : this->value
+            ));
     #elif __AVR__
-        analogWrite(this->channel, (this->inverted ? getColorInversion() : this->value));
-    #else
-        ;
+        analogWrite(this->channel, (
+                this->inverted ? getColorInversion() : this->value
+            ));
     #endif
 }
 
@@ -65,8 +78,6 @@ void ColorChannel::overwrite(uint16_t val) {
         ledcWrite(this->channel, val);
     #elif __AVR__
         analogWrite(this->channel, val);
-    #else
-        ;
     #endif
 }
 
@@ -153,13 +164,19 @@ bool ColorChannel::fading() {
 }
 
 uint32_t ColorChannel::getDelta() {
-    this->delta = abs(static_cast<int32_t>(this->value) - static_cast<int32_t>(this->target));
+    this->delta = abs(
+            static_cast<int32_t>(this->value)
+            - static_cast<int32_t>(this->target)
+        );
     return this->delta;
 }
 
 void ColorChannel::calculate(uint32_t numSteps) {
     if (numSteps) {
-        this->stepSize = (static_cast<double>(this->delta) / static_cast<double>(numSteps));
+        this->stepSize = (
+                static_cast<double>(this->delta)
+                / static_cast<double>(numSteps)
+            );
     } else {
         this->stepSize = 0;
     }

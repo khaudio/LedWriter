@@ -42,6 +42,8 @@ class Hold : public SimpleSerialBase {
 };
 
 class Effect : public SimpleSerialBase {
+    protected:
+        int16_t vary(int32_t, uint32_t&);
     public:
         bool
             verbose = false, active = false, recall = false,

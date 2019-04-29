@@ -25,10 +25,13 @@
 #ifndef SIMPLESERIALBASE_H
 #define SIMPLESERIALBASE_H
 
-#include <iostream>
+#if ESP32 || ESP8266 || __AVR__
+    #include <Arduino.h>
+#else
+    #include <iostream>
+#endif
 #include <string>
 #include <sstream>
-#include <Arduino.h>
 
 #define sout SimpleSerialStream()
 
@@ -49,13 +52,21 @@ class SimpleSerialStream {
     public:
         template <typename T>
         SimpleSerialStream &operator<<(const T &message) {
-            Serial.print(message);
+            #if ESP32 || ESP8266 || __AVR__
+                Serial.print(message);
+            #else
+                std::cout << message;
+            #endif
             return *this;
         }
         SimpleSerialStream &operator<<(std::ostream &(*stream)(std::ostream&)) {
             std::ostringstream sstream;
             sstream << stream;
-            Serial.print(sstream.str().c_str());
+            #if ESP32 || ESP8266 || __AVR__
+                Serial.print(sstream.str().c_str());
+            #else
+                std::cout << sstream.str().c_str();
+            #endif
             return *this;
         }
 };

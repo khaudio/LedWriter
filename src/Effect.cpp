@@ -48,7 +48,9 @@ void Hold::init(uint32_t totalSteps) {
     }
     this->active = false, this->complete = false;
     // Reset remaining if hold is being reinitialized in Effect loop
-    this->remaining = (this->remaining == this->duration) ? this->remaining : this->duration;
+    this->remaining = (
+            this->remaining == this->duration
+        ) ? this->remaining : this->duration;
     // Count down to trigger start
     this->threshold = totalSteps - (totalSteps * this->start);
     if (this->verbose) {
@@ -64,7 +66,9 @@ void Hold::status() {
     if (this->verbose) {
             Serial.printf(
                     "\t\tActive: %s, Threshold: %u, Remaining: %lld\n",
-                    (this->active ? "True" : "False"), this->threshold, this->remaining
+                    (
+                            this->active ? "True" : "False"
+                        ), this->threshold, this->remaining
                 );
         }
 }
@@ -179,7 +183,8 @@ uint32_t Effect::secondsToMicroseconds(double seconds) {
 
 void Effect::setDuration(double seconds) {
     uint32_t microseconds = secondsToMicroseconds(seconds);
-    this->duration = (microseconds ? microseconds : 1); // Minimum duration 1 microsecond
+    // Minimum duration 1 microsecond
+    this->duration = (microseconds ? microseconds : 1);
 }
 
 void Effect::defer() {
@@ -208,28 +213,49 @@ void Effect::updateTimers(double duration, uint32_t absoluteStart) {
     this->start = absoluteStart;
 }
 
-void Effect::varyStart(int32_t boundary) {
+int16_t Effect::vary(int32_t boundary, uint32_t& var) {
     if (!boundary) {
         return;
     }
     srand(micros());
     int16_t variance = rand();
-    if (abs(variance) < boundary && ((this->start + variance) > *this->now)) {
-        this->start += variance;
-        this->end += variance;
+    if (abs(variance) < boundary && (
+            (var + variance) > *this->now
+        )) {
+        var += variance;
     }
+    return variance;
+}
+
+void Effect::varyStart(int32_t boundary) {
+    // if (!boundary) {
+    //     return;
+    // }
+    // srand(micros());
+    // int16_t variance = rand();
+    // if (abs(variance) < boundary && (
+    //         (this->start + variance) > *this->now
+    //     )) {
+    //     this->start += variance;
+    //     this->end += variance;
+    // }
+    this->end += vary(boundary, this->start);
 }
 
 void Effect::varyDuration(int32_t boundary) {
-    if (!boundary) {
-        return;
-    }
-    srand(micros());
-    int16_t variance = rand();
-    if (abs(variance) < boundary && ((this->start + variance) > *this->now)) {
-        this->duration += variance;
-        this->end = this->start + this->duration;
-    }
+    // if (!boundary) {
+    //     return;
+    // }
+    // srand(micros());
+    // int16_t variance = rand();
+    // if (abs(variance) < boundary && (
+    //         (this->start + variance) > *this->now
+    //     )) {
+    //     this->duration += variance;
+    //     this->end = this->start + this->duration;
+    // }
+    vary(boundary, this->duration);
+    this->end = this->start + this->duration;
 }
 
 void Effect::hold(double durationInSeconds, double timeIndex) {
@@ -296,7 +322,8 @@ void Effect::activate() {
     if (this->verbose) {
         Serial.printf(
                 "\tActivated effect UID %u with start time %u, end time %u at %u with %u steps\n",
-                this->uid, this->start, this->end, *this->now, this->totalSteps
+                this->uid, this->start, this->end,
+                *this->now, this->totalSteps
             );
         Serial.printf(
                 "\tChannel step sizes: %f, %f, %f\n",
@@ -352,7 +379,10 @@ void Effect::step() {
     if (elapsed && !holding() && (this->stepsRemaining > 0)) {
         int64_t iterations = elapsed / this->stepLength;
         if (iterations >= 1) {
-            iterations = (iterations <= this->stepsRemaining ? iterations : this->stepsRemaining);
+            iterations = (
+                    iterations <= this->stepsRemaining
+                    ? iterations : this->stepsRemaining
+                );
             for (int i = 0; i < iterations; i++) {
                 this->stepsRemaining--;
                 for (auto channel: *this->channels) {
@@ -370,7 +400,8 @@ void Effect::step() {
 }
 
 bool Effect::run() {
-    // Main loop for Effects; returns true upon activation (not while stepping).
+    /* Main loop for Effects;
+    returns true upon activation (not while stepping). */
     if (this->active && complete()) {
         this->active = false;
         this->last = *this->now;
@@ -405,8 +436,13 @@ void Effect::status() {
                 "\tStart: %u End: %u Duration: %u Now: %u\n",
                 this->start, this->end, this->duration, *this->now
             );
-        Serial.printf("\tStep Length: %u Steps Remaining: %u\n", this->stepLength, this->stepsRemaining);
-        double secondsRemaining = (this->stepsRemaining * this->stepLength) / 1000000;
+        Serial.printf(
+                "\tStep Length: %u Steps Remaining: %u\n",
+                this->stepLength, this->stepsRemaining
+            );
+        double secondsRemaining = (
+                this->stepsRemaining * this->stepLength
+            ) / 1e6;
         Serial.printf("\tSeconds remaining: %f\n", secondsRemaining);
         Serial.printf(
                 "\tHolds: %u\tLooping: %s\n",
