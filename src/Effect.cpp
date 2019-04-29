@@ -215,7 +215,7 @@ void Effect::updateTimers(double duration, uint32_t absoluteStart) {
 
 int16_t Effect::vary(int32_t boundary, uint32_t& var) {
     if (!boundary) {
-        return;
+        return 0;
     }
     srand(micros());
     int16_t variance = rand();
