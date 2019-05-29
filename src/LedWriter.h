@@ -27,9 +27,15 @@
 
 #include <vector>
 #include <stdint.h>
+#include <thread>
 #include "Effect.h"
 
+#if !IS_EMBEDDED
+    #include <chrono>
+#endif
+
 #define MAX_EFFECTS     1000
+#define USE_TASKS       false
 
 class GlobalSave
 {
@@ -140,6 +146,8 @@ class LedWriter : public SimpleSerialBase {
         void test(double duration=1.5);
         void status();
         void run();
+        friend void loop();
+        void startTasks();
 };
 
 #endif

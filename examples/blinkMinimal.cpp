@@ -6,6 +6,6 @@ void setup() {}
 
 void loop()
 {
-    writer.blink();
+    writer.blink(.5);
     writer.run();
 }

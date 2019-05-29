@@ -27,6 +27,7 @@
 
 #if ESP32 || ESP8266 || __AVR__
     #include <Arduino.h>
+    #define IS_EMBEDDED     true
 #else
     #include <iostream>
 #endif
@@ -52,7 +53,7 @@ class SimpleSerialStream {
     public:
         template <typename T>
         SimpleSerialStream &operator<<(const T &message) {
-            #if ESP32 || ESP8266 || __AVR__
+            #ifdef IS_EMBEDDED
                 Serial.print(message);
             #else
                 std::cout << message;
@@ -62,10 +63,10 @@ class SimpleSerialStream {
         SimpleSerialStream &operator<<(std::ostream &(*stream)(std::ostream&)) {
             std::ostringstream sstream;
             sstream << stream;
-            #if ESP32 || ESP8266 || __AVR__
+            #ifdef IS_EMBEDDED
                 Serial.print(sstream.str().c_str());
             #else
-                std::cout << sstream.str().c_str();
+                std::cout << sstream.str();
             #endif
             return *this;
         }

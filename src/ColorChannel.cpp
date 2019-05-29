@@ -35,15 +35,12 @@ ColorChannel::ColorChannel(
     this->maximum = this->absoluteMaximum;
     this->channel = channel;
     this->resolution = (resolution >= 1 && resolution <= 15 ? resolution : 8);
-    double maxFrequency = (80000000 / std::pow(2, resolution));
+    double maxFrequency = (8e7 / std::pow(2, resolution));
     this->frequency = (
             frequency <= 0 || (frequency > maxFrequency)
         ) ? maxFrequency : frequency;
     #if ESP32 || ESP8266
-        pinMode(this->pin, OUTPUT);
         ledcAttachPin(this->pin, this->channel);
-        /* ledcSetup denotes 0-15 for bits 1-16,
-        but only 0-14 appear to work properly. */
         ledcSetup(this->channel, this->frequency, this->resolution);
     #elif __AVR__
         pinMode(this->pin, OUTPUT);
@@ -82,9 +79,7 @@ void ColorChannel::overwrite(uint16_t val) {
 }
 
 uint16_t ColorChannel::conformAbsolute(uint16_t val) {
-    val = val > this->absoluteMaximum ? this->absoluteMaximum : val;
-    val = val < 0 ? 0 : val;
-    return val;
+    return val > this->absoluteMaximum ? this->absoluteMaximum : val;
 }
 
 uint16_t ColorChannel::conform(uint16_t val) {
@@ -152,11 +147,13 @@ void ColorChannel::save() {
     this->last = this->value;
 }
 
-void ColorChannel::recall(bool immediate) {
+uint16_t ColorChannel::recall(bool immediate) {
     this->value = this->last;
+    this->target = this->value;
     if (immediate) {
         write();
     }
+    return this->value;
 }
 
 bool ColorChannel::fading() {

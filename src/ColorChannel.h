@@ -26,6 +26,7 @@
 #define COLORCHANNEL_H
 
 #include <algorithm>
+#include <cmath>
 #include <stdint.h>
 #include "SimpleSerialBase.h"
 
@@ -56,7 +57,7 @@ class ColorChannel : public SimpleSerialBase {
         void clear();
         void invert(bool immediate=false);
         void save();
-        void recall(bool immediate=false);
+        uint16_t recall(bool immediate=false);
         bool fading();
         uint32_t getDelta();
         void calculate(uint32_t numSteps = 1);

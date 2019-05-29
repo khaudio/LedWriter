@@ -40,7 +40,9 @@ void GlobalSave::enable(uint32_t uidToSave, uint32_t uidToRecall)
 
 void GlobalSave::save(uint16_t red, uint16_t green, uint16_t blue)
 {
-    this->saved = {red, green, blue};
+    this->saved[0] = red;
+    this->saved[1] = green;
+    this->saved[2] = blue;
 }
 
 void GlobalSave::save(std::array<uint16_t, 3> values)
@@ -57,7 +59,6 @@ bool GlobalSave::saveInquiry(uint32_t uid)
 {
     return (this->enabled && (uid == this->saveUID));
 }
-
 
 bool GlobalSave::recallInquiry(uint32_t uid)
 {
@@ -82,9 +83,14 @@ LedWriter::LedWriter(
     this->globalSave->save(getCurrent());
     setPolarityInversion(this->inverted);
     this->effects.reserve(MAX_EFFECTS);
-    this->timeIndex = micros();
+    #ifdef IS_EMBEDDED
+        this->timeIndex = micros();
+    #endif
     on ? full(true) : clear(true);
     updateClock();
+    #if USE_TASKS
+        startTasks();
+    #endif
 }
 
 LedWriter::~LedWriter() {
@@ -164,6 +170,7 @@ std::array<uint16_t, 3> LedWriter::getMin() {
 }
 
 void LedWriter::set(std::array<uint16_t, 3> values, bool immediate) {
+    print("Setting values");
     if (immediate) {
         clearEffects();
         for (int i = 0; i < 3; i++) {
@@ -179,7 +186,8 @@ void LedWriter::set(
         uint16_t redValue, uint16_t greenValue, uint16_t blueValue,
         bool immediate
     ) {
-    set(std::array<uint16_t, 3>{redValue, greenValue, blueValue}, immediate);
+    std::array<uint16_t, 3> values = {redValue, greenValue, blueValue};
+    set(values, immediate);
 }
 
 Effect* LedWriter::createEffect(
@@ -222,10 +230,12 @@ Effect* LedWriter::createEffectAbsolute(
         }
     }
     if (!updated) {
-        if ((this->effects.size() >= MAX_EFFECTS) || (ESP.getFreeHeap() < 32768)) {
-            print("Insufficient memory for effect creation");
-            return nullptr;
-        }
+        #ifdef IS_EMBEDDED
+            if ((this->effects.size() >= MAX_EFFECTS) || (ESP.getFreeHeap() < 32768)) {
+                print("Insufficient memory for effect creation");
+                return nullptr;
+            }
+        #endif
         this->effects.push_back(new Effect(
                 target, &this->channels, &this->now,
                 duration, recall, absoluteStart,
@@ -286,10 +296,12 @@ void LedWriter::increment(
         int32_t redValue, int32_t greenValue, int32_t blueValue,
         bool immediate
     ) {
-    increment(std::array<int32_t, 3> {redValue, greenValue, blueValue}, immediate);
+    std::array<int32_t, 3> values = {redValue, greenValue, blueValue};
+    increment(values, immediate);
 }
 
 void LedWriter::save(bool global) {
+    print("Saving");
     if (global) {
         this->globalSave->save(getCurrent());
         this->globalSave->enabled = true;
@@ -302,20 +314,21 @@ void LedWriter::save(bool global) {
 }
 
 std::array<uint16_t, 3> LedWriter::recall(bool global, bool apply, bool immediate) {
+    print("Recalling");
     std::array<uint16_t, 3> recalled;
     if (global) {
         recalled = this->globalSave->recall();
         this->globalSave->clear();
     } else {
         for (int i = 0; i < 3; i++) {
-            recalled[i] = this->channels[i]->last;
+            recalled[i] = this->channels[i]->recall();
         }
     }
     if (apply) {
         set(recalled, immediate);
     }
-    return recalled;
     print("Recalled");
+    return recalled;
 }
 
 std::array<uint16_t, 3> LedWriter::full(bool immediate) {
@@ -365,21 +378,20 @@ std::array<uint16_t, 3> LedWriter::secondary(uint8_t channel, uint16_t value) {
 }
 
 std::array<uint16_t, 3> LedWriter::getCurrent() {
-    return std::array<uint16_t, 3>{
+    std::array<uint16_t, 3> values = {
             *(this->color[0]),
             *(this->color[1]),
             *(this->color[2])
         };
+    return values;
 }
 
 std::array<uint16_t, 3> LedWriter::getTarget() {
     std::array<uint16_t, 3> values;
     if (this->effect != nullptr) {
-        values = std::array<uint16_t, 3>{
-                this->effect->target[0],
-                this->effect->target[1],
-                this->effect->target[2]
-            };
+        for (int i = 0; i < 3; ++i) {
+            values[i] = this->effect->target[i];
+        }
     } else {
         values = getCurrent();
     }
@@ -442,7 +454,8 @@ bool LedWriter::isColor(std::array<uint16_t, 3> target) {
 }
 
 bool LedWriter::isColor(uint16_t red, uint16_t green, uint16_t blue) {
-    return isColor(std::array<uint16_t, 3>{red, green, blue});
+    std::array<uint16_t, 3> values = {red, green, blue};
+    return isColor(values);
 }
 
 void LedWriter::invert() {
@@ -468,9 +481,14 @@ bool LedWriter::updateClock(uint32_t* currentTime, bool adjust) {
         }
         print("Clock synchronized");
     } else {
-        this->now += (micros() - this->timeIndex);
+        #ifdef IS_EMBEDDED
+            this->now += (micros() - this->timeIndex);
+        #endif
     }
-    this->timeIndex = micros();
+
+    #ifdef IS_EMBEDDED
+        this->timeIndex = micros();
+    #endif
     // Return whether a clock rollover has occured
     return ((this->now < before) && (!adjust));
 }
@@ -544,6 +562,7 @@ void LedWriter::cycleEffects() {
                     this->effects.push_back(this->effect);
                 } else {
                     delete this->effect;
+                    this->effect = nullptr;
                 }
             }
             this->effects.erase(this->effects.begin());
@@ -567,16 +586,18 @@ void LedWriter::cycleEffects() {
 void LedWriter::clearEffects(bool cancel) {
     print("Clearing effects");
     if (effectsQueued()) {
-        if (cancel) {
-            this->effect = nullptr;
-        }
         int end = cancel ? 0 : 1;
         for (int i = this->effects.size() - 1; i >= end; --i) {
             if (this->verbose) {
-                Serial.printf("Deleting effect UID %d\n", this->effects[i]->uid);
+                Serial.printf("\tClearing effect UID %d\n", this->effects[i]->uid);
             }
-            delete this->effects[i];
+            if (this->effects[i] != nullptr) {
+                delete this->effects[i];
+            }
             this->effects.erase(this->effects.begin() + i);
+        }
+        if (cancel) {
+            this->effect = nullptr;
         }
         if (this->effects.size() >= 10) {
             this->effects.shrink_to_fit();
@@ -748,4 +769,31 @@ void LedWriter::run() {
     */
     updateClock();
     cycleEffects();
+}
+
+void loop(void* parameter) {
+    // Loop for threaded operation
+    LedWriter* instance = static_cast<LedWriter*>(parameter);
+    while (true) {
+        instance->run();
+        #if ESP32
+            vTaskDelay(2);
+        #else
+            std::this_thread::yield();
+        #endif
+    }
+}
+
+void LedWriter::startTasks() {
+    print("Starting run task");
+    #if ESP32
+        xTaskCreatePinnedToCore(loop, "runner", 40000, this, 1, NULL, 1);
+    #elif ESP8266
+        xTaskCreate(loop, "runner", 40000, this, 1, NULL);
+    #elif __AVR__
+        return;
+    #else
+        std::thread(loop);
+    #endif
+    print("Run task started");
 }
