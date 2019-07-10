@@ -1,9 +1,13 @@
 #include "LedWriter.h"
 
-LedWriter<3> writer(
+std::array<uint8_t, 3> pins = {
         15, // Red output pin
         13, // Green output pin
         12, // Blue output pin
+    };
+
+LedWriter<3> writer(
+        pins,
         10, // Resolution (1-15); 10-bit allows a range of 0-1023
         true // Whether to initialize output in constructor
     );

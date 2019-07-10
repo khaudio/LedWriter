@@ -1,6 +1,6 @@
 {
     "name": "LedWriter",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "keywords": "led, light, rgb",
     "description": "Non-blocking effects framework for granular color control of RGB LEDs connected to embedded devices.",
     "repository":

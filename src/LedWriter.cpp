@@ -74,6 +74,30 @@ LedWriter<N>::LedWriter(
     init(pinArray, resolution, on);
 }
 
+template <>
+LedWriter<1>::LedWriter(uint8_t resolution, bool on) {
+    std::array<uint8_t, 1> pins = {15};
+    init(pins, resolution, on);
+}
+
+template <>
+LedWriter<2>::LedWriter(uint8_t resolution, bool on) {
+    std::array<uint8_t, 2> pins = {15, 13};
+    init(pins, resolution, on);
+}
+
+template <>
+LedWriter<3>::LedWriter(uint8_t resolution, bool on) {
+    std::array<uint8_t, 3> pins = {15, 13, 12};
+    init(pins, resolution, on);
+}
+
+template <>
+LedWriter<4>::LedWriter(uint8_t resolution, bool on) {
+    std::array<uint8_t, 4> pins = {15, 13, 12, 16};
+    init(pins, resolution, on);
+}
+
 template <unsigned int N>
 void LedWriter<N>::init(std::array<uint8_t, N> pins, uint8_t resolution, bool on) {
     this->resolution = (resolution >= 1 && resolution <= 15 ? resolution : 8);
@@ -638,7 +662,7 @@ void LedWriter<N>::hold(double seconds, double timeIndex, bool all) {
         print("Setting hold on current effect");
         this->effects.front()->hold(seconds, timeIndex);
         if (all && (this->effects.size() > 1)) {
-            for (int i = 1; i < this->effects.size(); i++) {
+            for (int i = 1; i < this->effects.size(); ++i) {
                 this->effects[i]->hold(seconds, timeIndex);
             }
         }
@@ -728,7 +752,7 @@ template <unsigned int N>
 void LedWriter<N>::rotate(double duration) {
     // Cycles RYGCBM once; non-blocking.  Duration sets length of one full cycle.
     double divided = (duration ? duration : this->globalEffectDuration) / 6;
-    for (int i = 0, j = 0; i < 3; i++, j += 2) {
+    for (int i = 0, j = 0; i < 3; ++i, j += 2) {
         createEffect(primary(i), divided, false, 0, 0, 0, j, false, 0);
         createEffect(secondary(i), divided,  false, 0, 0, 0, j + 1, false, 0);
     }
