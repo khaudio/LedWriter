@@ -25,7 +25,7 @@
 
 #include "LedWriter.h"
 
-LedWriter writer;
+LedWriter<3> writer;
 
 void setup()
 {

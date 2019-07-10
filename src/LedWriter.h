@@ -22,12 +22,13 @@
  *
  */
 
+
 #ifndef LEDWRITER_H
 #define LEDWRITER_H
 
-#include <vector>
 #include <stdint.h>
 #include <thread>
+#include <vector>
 #include "Effect.h"
 
 #if !IS_EMBEDDED
@@ -37,106 +38,101 @@
 #define MAX_EFFECTS     1000
 #define USE_TASKS       false
 
-class GlobalSave
-{
+template <unsigned int N=3>
+class GlobalSave {
     public:
         bool enabled = false;
         uint32_t saveUID = 0, recallUID = 0;
-        std::array<uint16_t, 3> saved = {{0, 0, 0}};
+        std::array<uint16_t, N> saved;
         void clear();
         void enable(uint32_t, uint32_t);
-        void save(uint16_t, uint16_t, uint16_t);
-        void save(std::array<uint16_t, 3>);
-        std::array<uint16_t, 3> recall();
+        void save(std::array<uint16_t, N>);
+        std::array<uint16_t, N> recall();
         bool recallInquiry(uint32_t);
         bool saveInquiry(uint32_t);
 };
 
-
+template <unsigned int N=3>
 class LedWriter : public SimpleSerialBase {
     public:
-        std::array<ColorChannel*, 3> channels;
-        std::array<uint16_t*, 3> color;
-        GlobalSave* globalSave;
-        std::vector<Effect*> effects;
-        Effect* effect = nullptr;
+        std::array<ColorChannel*, N> channels;
+        std::array<uint16_t*, N> color;
+        GlobalSave<N>* globalSave;
+        std::vector<Effect<N>*> effects;
+        Effect<N>* effect = nullptr;
         bool inverted = false, verbose = false;
         double frequency, globalEffectDuration = 1e-6;
         uint8_t resolution;
         uint16_t absoluteMaximum, maximum, minimum = 0;
         uint32_t timeIndex = 0, now = 0, lastUID = 0, lastCompletion = 0;
-        LedWriter(
-                uint8_t redPin=15,
-                uint8_t greenPin=13,
-                uint8_t bluePin=12,
-                uint8_t resolution=10,
-                bool on=true
-            );
+        LedWriter(std::array<uint8_t, N>, uint8_t=10, bool=true);
+        LedWriter(uint8_t=10, bool=true);
+        void init(std::array<uint8_t, N>, uint8_t=10, bool=true);
+        // LedWriter(
+        //         uint8_t redPin=15,
+        //         uint8_t greenPin=13,
+        //         uint8_t bluePin=12,
+        //         uint8_t resolution=10,
+        //         bool on=true
+        //     );
         ~LedWriter();
         void setPolarityInversion(bool);
-        void setScale(uint8_t redScale=1, uint8_t greenScale=1, uint8_t blueScale=1);
-        void setOffset(uint16_t redOffset=0, uint16_t greenOffset=0, uint16_t blueOffset=0);
-        void setMax(uint16_t, uint16_t, uint16_t);
+        void setScale(std::array<double, N>);
+        void setOffset(std::array<int16_t, N>);
         void setMax(uint16_t);
-        void setMin(uint16_t, uint16_t, uint16_t);
+        void setMax(std::array<uint16_t, N>);
         void setMin(uint16_t);
-        std::array<uint16_t, 3> getMax();
-        std::array<uint16_t, 3> getMin();
-        void set(std::array<uint16_t, 3>, bool immediate=false);
-        void set(uint16_t, uint16_t, uint16_t, bool immediate=false);
-        Effect* createEffect(
-                std::array<uint16_t, 3> target,
+        void setMin(std::array<uint16_t, N>);
+        std::array<uint16_t, N> getMax();
+        std::array<uint16_t, N> getMin();
+        void set(std::array<uint16_t, N>, bool immediate=false);
+        Effect<N>* createEffect(
+                std::array<uint16_t, N> target,
                 double duration=0, bool recall=false, double relativeStart=0,
                 double startVariation=0, double durationVariation=0,
                 uint32_t effectUID=0, bool updateUID=false, int32_t loop=0
             );
-        Effect* createEffectAbsolute(
-                std::array<uint16_t, 3> target,
+        Effect<N>* createEffectAbsolute(
+                std::array<uint16_t, N> target,
                 double duration=0, bool recall=false, uint32_t absoluteStart=0,
                 double startVariation=0, double durationVariation=0,
                 uint32_t effectUID=0, bool updateUID=false, int32_t loop=0
             );
         void alignEffects();
         void write();
-        void overwrite(std::array<uint16_t, 3>);
-        void overwrite(uint16_t, uint16_t, uint16_t);
+        void overwrite(std::array<uint16_t, N>);
         void save(bool global=false);
-        std::array<uint16_t, 3> recall(bool global=false, bool apply=true, bool immediate=true);
-        std::array<uint16_t, 3> full(bool immediate=true);
-        std::array<uint16_t, 3> clear(bool immediate=true);
-        std::array<uint16_t, 3> primary(uint8_t, uint16_t value=0);
-        std::array<uint16_t, 3> secondary(uint8_t, uint16_t value=0);
-        std::array<uint16_t, 3> getCurrent();
-        std::array<uint16_t, 3> getTarget();
-        std::array<uint16_t, 3> getColorInversion(std::array<uint16_t, 3>);
-        std::array<uint16_t, 3> getColorInversion();
+        std::array<uint16_t, N> recall(bool global=false, bool apply=true, bool immediate=true);
+        std::array<uint16_t, N> full(bool immediate=true);
+        std::array<uint16_t, N> clear(bool immediate=true);
+        std::array<uint16_t, N> primary(uint8_t, uint16_t value=0);
+        std::array<uint16_t, N> secondary(uint8_t, uint16_t value=0);
+        std::array<uint16_t, N> getCurrent();
+        std::array<uint16_t, N> getTarget();
+        std::array<uint16_t, N> getColorInversion(std::array<uint16_t, N>);
+        std::array<uint16_t, N> getColorInversion();
         bool illuminated();
         bool isMax(bool absolute=false);
         bool isMin();
-        bool isColor(std::array<uint16_t, 3>);
-        bool isColor(uint16_t, uint16_t, uint16_t);
+        bool isColor(std::array<uint16_t, N>);
         void invert();
-        void increment(std::array<int32_t, 3>, bool immediate=true);
-        void increment(
-                int32_t redValue=1, int32_t greenValue=1, int32_t blueValue=1,
-                bool immediate=true
-            );
+        void increment(std::array<int32_t, N>, bool=true);
         void updateTimers(uint32_t delta);
         bool updateClock(uint32_t* currentTime=nullptr, bool adjust=false);
         uint32_t effectsQueued();
         bool effectsActive();
         int looping();
         void skipEffect();
-        void updateEffects(std::array<uint16_t, 3>);
-        Effect* nextEffect();
-        Effect* lastEffect();
+        void updateEffects(std::array<uint16_t, N>);
+        Effect<N>* nextEffect();
+        Effect<N>* lastEffect();
         void cycleEffects();
         void clearEffects(bool cancel=true);
         void hold(double=0.5, double timeIndex=1, bool all=false);
         void holdLast(double=0.5, double timeIndex=1);
         void resume();
         bool bounceFlash(
-                std::array<uint16_t, 3>, std::array<uint16_t, 3>,
+                std::array<uint16_t, N>, std::array<uint16_t, N>,
                 double fadeDuration=0, double holdDuration=0
             );
         bool bounce(double fadeDuration=0, double holdDuration=0);
@@ -151,3 +147,11 @@ class LedWriter : public SimpleSerialBase {
 };
 
 #endif
+
+template class LedWriter<1>;
+template class LedWriter<2>;
+template class LedWriter<3>;
+template class LedWriter<4>;
+template class LedWriter<5>;
+
+// #include "LedWriter.cpp"

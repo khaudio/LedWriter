@@ -33,9 +33,10 @@
 class ColorChannel : public SimpleSerialBase {
     public:
         bool verbose = false, inverted = false;
-        double frequency, steps, stepSize;
-        uint8_t pin, channel, resolution, scale = 1;
-        uint16_t value, target, last, absoluteMaximum, maximum, minimum = 0, offset = 0;
+        double frequency, steps, stepSize, scale = 1;
+        uint8_t pin, channel, resolution;
+        int16_t offset = 0;
+        uint16_t value, target, last, absoluteMaximum, maximum, minimum = 0;
         uint16_t* color = &value;
         uint32_t delta, lastRounded;
         ColorChannel(uint8_t pin, uint8_t channel, uint8_t resolution=8, double frequency=0);

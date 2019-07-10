@@ -41,6 +41,7 @@ class Hold : public SimpleSerialBase {
         bool step(uint32_t);
 };
 
+template <unsigned int N=3>
 class Effect : public SimpleSerialBase {
     protected:
         int16_t vary(int32_t, uint32_t&);
@@ -52,13 +53,13 @@ class Effect : public SimpleSerialBase {
             *now, last, start, end, duration, uid,
             stepLength = 1, stepsRemaining = 0, totalSteps = 0;
         int32_t loop = 0;
-        std::array<uint16_t*, 3> current, globalLast;
-        std::array<uint16_t, 3> target;
-        std::array<ColorChannel*, 3>* channels;
+        std::array<uint16_t*, N> current, globalLast;
+        std::array<uint16_t, N> target;
+        std::array<ColorChannel*, N>* channels;
         std::vector<Hold*> holds, secondaryHolds;
         Effect(
-                std::array<uint16_t, 3> target,
-                std::array<ColorChannel*, 3>* channels,
+                std::array<uint16_t, N> target,
+                std::array<ColorChannel*, N>* channels,
                 uint32_t* now,
                 double duration=0,
                 bool recall=false,
@@ -91,3 +92,11 @@ class Effect : public SimpleSerialBase {
 };
 
 #endif
+
+template class Effect<1>;
+template class Effect<2>;
+template class Effect<3>;
+template class Effect<4>;
+template class Effect<5>;
+
+// #include <Effect.cpp>

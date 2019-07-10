@@ -24,62 +24,70 @@
 
 #include "LedWriter.h"
 
-void GlobalSave::clear()
+template <unsigned int N>
+void GlobalSave<N>::clear()
 {
     this->enabled = false;
     this->saveUID = 0;
     this->recallUID = 0;
 }
 
-void GlobalSave::enable(uint32_t uidToSave, uint32_t uidToRecall)
+template <unsigned int N>
+void GlobalSave<N>::enable(uint32_t uidToSave, uint32_t uidToRecall)
 {
     this->enabled = true;
     this->saveUID = uidToSave;
     this->recallUID = uidToRecall;
 }
 
-void GlobalSave::save(uint16_t red, uint16_t green, uint16_t blue)
+template <unsigned int N>
+void GlobalSave<N>::save(std::array<uint16_t, N> values)
 {
-    this->saved[0] = red;
-    this->saved[1] = green;
-    this->saved[2] = blue;
+    for (int i = 0; i < N; ++i)
+    {
+        this->saved[i] = values[i];
+    }
 }
 
-void GlobalSave::save(std::array<uint16_t, 3> values)
-{
-    this->saved = values;
-}
-
-std::array<uint16_t, 3> GlobalSave::recall()
+template <unsigned int N>
+std::array<uint16_t, N> GlobalSave<N>::recall()
 {
     return this->saved;
 }
 
-bool GlobalSave::saveInquiry(uint32_t uid)
+template <unsigned int N>
+bool GlobalSave<N>::saveInquiry(uint32_t uid)
 {
     return (this->enabled && (uid == this->saveUID));
 }
 
-bool GlobalSave::recallInquiry(uint32_t uid)
+template <unsigned int N>
+bool GlobalSave<N>::recallInquiry(uint32_t uid)
 {
     return (this->enabled && (uid == this->recallUID));
 }
 
-LedWriter::LedWriter(
-        uint8_t redPin, uint8_t greenPin, uint8_t bluePin,
-        uint8_t resolution, bool on
+template <unsigned int N>
+LedWriter<N>::LedWriter(
+        std::array<uint8_t, N> pinArray, uint8_t resolution, bool on
     ) {
-    std::array<int, 3> pins = {redPin, greenPin, bluePin};
+    init(pinArray, resolution, on);
+}
+
+template <unsigned int N>
+void LedWriter<N>::init(std::array<uint8_t, N> pins, uint8_t resolution, bool on) {
     this->resolution = (resolution >= 1 && resolution <= 15 ? resolution : 8);
     uint16_t multiplied = std::pow(2, this->resolution);
     this->frequency = (80000000 / multiplied);
     this->absoluteMaximum = (multiplied - 1);
     this->maximum = this->absoluteMaximum;
-    for (int i = 0; i < 3; i++) {
-        this->channels[i] = new ColorChannel(pins[i], i, this->resolution, this->frequency);
+    for (int i = 0; i < N; ++i) {
+        this->channels[i] = new ColorChannel(
+                pins[i], i, this->resolution, this->frequency
+            );
         this->color[i] = this->channels[i]->color;
     }
-    this->globalSave = new GlobalSave;
+    this->globalSave = new GlobalSave<N>;
     this->globalSave->save(getCurrent());
     setPolarityInversion(this->inverted);
     this->effects.reserve(MAX_EFFECTS);
@@ -93,7 +101,8 @@ LedWriter::LedWriter(
     #endif
 }
 
-LedWriter::~LedWriter() {
+template <unsigned int N>
+LedWriter<N>::~LedWriter() {
     clearEffects();
     for (auto channel: this->channels) {
         delete channel;
@@ -103,7 +112,8 @@ LedWriter::~LedWriter() {
     this->globalSave = nullptr;
 }
 
-void LedWriter::setPolarityInversion(bool inverted) {
+template <unsigned int N>
+void LedWriter<N>::setPolarityInversion(bool inverted) {
     this->inverted = inverted;
     for (auto channel: this->channels) {
         channel->inverted = this->inverted;
@@ -111,69 +121,78 @@ void LedWriter::setPolarityInversion(bool inverted) {
     print("Set inversion");
 }
 
-void LedWriter::setScale(uint8_t redScale, uint8_t greenScale, uint8_t blueScale) {
-    std::array<uint8_t, 3> scaleValues = {redScale, greenScale, blueScale};
-    for (int i = 0; i < 3; i++) {
-        this->channels[i]->scale = scaleValues[i];
+template <unsigned int N>
+void LedWriter<N>::setScale(std::array<double, N> values) {
+    for (int i = 0; i < N; ++i) {
+        this->channels[i]->scale = values[i];
     }
 }
 
-void LedWriter::setOffset(uint16_t redOffset, uint16_t greenOffset, uint16_t blueOffset) {
-    std::array<uint16_t, 3> offsetValues = {redOffset, greenOffset, blueOffset};
-    for (int i = 0; i < 3; i++) {
-        this->channels[i]->offset = offsetValues[i];
+template <unsigned int N>
+void LedWriter<N>::setOffset(std::array<int16_t, N> values) {
+    for (int i = 0; i < N; ++i) {
+        this->channels[i]->offset = values[i];
     }
 }
 
-void LedWriter::setMax(uint16_t globalMax) {
+template <unsigned int N>
+void LedWriter<N>::setMax(uint16_t globalMax) {
     // Sets global max to both LedWriter instance as well as all color channels
     this->maximum = globalMax;
-    setMax(globalMax, globalMax, globalMax);
-}
-
-void LedWriter::setMax(uint16_t redMax, uint16_t greenMax, uint16_t blueMax) {
-    // Sets specific soft maximum values for each color channel
-    std::array<uint16_t, 3> maxValues = {redMax, greenMax, blueMax};
-    for (int i = 0; i < 3; i++) {
-        this->channels[i]->setMax(maxValues[i]);
+    for (int i = 0; i < N; ++i) {
+        this->channels[i]->setMax(this->maximum);
     }
 }
 
-void LedWriter::setMin(uint16_t globalMin) {
+template <unsigned int N>
+void LedWriter<N>::setMax(std::array<uint16_t, N> values) {
+    // Sets specific soft maximum values for each color channel
+    for (int i = 0; i < N; ++i) {
+        this->channels[i]->setMax(values[i]);
+    }
+}
+
+template <unsigned int N>
+void LedWriter<N>::setMin(uint16_t globalMin) {
     // Sets global min to both LedWriter instance as well as all color channels
     this->minimum = globalMin;
-    setMin(globalMin, globalMin, globalMin);
-}
-
-void LedWriter::setMin(uint16_t redMin, uint16_t greenMin, uint16_t blueMin) {
-    // Sets specific minimum values for each color channel
-    std::array<uint16_t, 3> minValues = {redMin, greenMin, blueMin};
-    for (int i = 0; i < 3; i++) {
-        this->channels[i]->setMin(minValues[i]);
+    for (int i = 0; i < N; ++i) {
+        this->channels[i]->setMin(this->minimum);
     }
 }
 
-std::array<uint16_t, 3> LedWriter::getMax() {
-    std::array<uint16_t, 3> softMaximum;
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+void LedWriter<N>::setMin(std::array<uint16_t, N> values) {
+    // Sets specific minimum values for each color channel
+    for (int i = 0; i < N; ++i) {
+        this->channels[i]->setMin(values[i]);
+    }
+}
+
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::getMax() {
+    std::array<uint16_t, N> softMaximum;
+    for (int i = 0; i < N; ++i) {
         softMaximum[i] = this->channels[i]->maximum;
     }
     return softMaximum;
 }
 
-std::array<uint16_t, 3> LedWriter::getMin() {
-    std::array<uint16_t, 3> softMinimum;
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::getMin() {
+    std::array<uint16_t, N> softMinimum;
+    for (int i = 0; i < N; ++i) {
         softMinimum[i] = this->channels[i]->minimum;
     }
     return softMinimum;
 }
 
-void LedWriter::set(std::array<uint16_t, 3> values, bool immediate) {
+template <unsigned int N>
+void LedWriter<N>::set(std::array<uint16_t, N> values, bool immediate) {
     print("Setting values");
     if (immediate) {
         clearEffects();
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < N; ++i) {
             this->channels[i]->set(values[i], immediate);
         }
     } else {
@@ -182,16 +201,9 @@ void LedWriter::set(std::array<uint16_t, 3> values, bool immediate) {
     print("Set values");
 }
 
-void LedWriter::set(
-        uint16_t redValue, uint16_t greenValue, uint16_t blueValue,
-        bool immediate
-    ) {
-    std::array<uint16_t, 3> values = {redValue, greenValue, blueValue};
-    set(values, immediate);
-}
-
-Effect* LedWriter::createEffect(
-        std::array<uint16_t, 3> target,
+template <unsigned int N>
+Effect<N>* LedWriter<N>::createEffect(
+        std::array<uint16_t, N> target,
         double duration, bool recall, double relativeStart,
         double startVariation, double durationVariation,
         uint32_t effectUID, bool updateUID, int32_t loop
@@ -209,14 +221,15 @@ Effect* LedWriter::createEffect(
         );
 }
 
-Effect* LedWriter::createEffectAbsolute(
-        std::array<uint16_t, 3> target,
+template <unsigned int N>
+Effect<N>* LedWriter<N>::createEffectAbsolute(
+        std::array<uint16_t, N> target,
         double duration, bool recall, uint32_t absoluteStart,
         double startVariation, double durationVariation,
         uint32_t effectUID, bool updateUID, int32_t loop
     ) {
     bool updated = false;
-    Effect* updatedEffect;
+    Effect<N>* updatedEffect;
     duration = (duration ? duration : this->globalEffectDuration);
     if (updateUID) {
         for (auto effect: this->effects) {
@@ -236,7 +249,7 @@ Effect* LedWriter::createEffectAbsolute(
                 return nullptr;
             }
         #endif
-        this->effects.push_back(new Effect(
+        this->effects.push_back(new Effect<N>(
                 target, &this->channels, &this->now,
                 duration, recall, absoluteStart,
                 startVariation, durationVariation,
@@ -250,7 +263,8 @@ Effect* LedWriter::createEffectAbsolute(
     print("Created effect");
 }
 
-void LedWriter::alignEffects() {
+template <unsigned int N>
+void LedWriter<N>::alignEffects() {
     if (!effectsQueued()) {
         return;
     }
@@ -267,40 +281,31 @@ void LedWriter::alignEffects() {
     }
 }
 
-void LedWriter::write() {
+template <unsigned int N>
+void LedWriter<N>::write() {
     for (auto channel: this->channels) {
         channel->write();
     }
     print("Applied");
 }
 
-void LedWriter::overwrite(std::array<uint16_t, 3> values) {
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+void LedWriter<N>::overwrite(std::array<uint16_t, N> values) {
+    for (int i = 0; i < N; ++i) {
         this->channels[i]->overwrite(values[i]);
     }
     print("Overwritten");
 }
 
-void LedWriter::overwrite(uint16_t redValue, uint16_t greenValue, uint16_t blueValue) {
-    std::array<uint16_t, 3> values = {redValue, greenValue, blueValue};
-    overwrite(values);
-}
-
-void LedWriter::increment(std::array<int32_t, 3> values, bool immediate) {
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+void LedWriter<N>::increment(std::array<int32_t, N> values, bool immediate) {
+    for (int i = 0; i < N; ++i) {
         this->channels[i]->increment(values[i], immediate);
     }
 }
 
-void LedWriter::increment(
-        int32_t redValue, int32_t greenValue, int32_t blueValue,
-        bool immediate
-    ) {
-    std::array<int32_t, 3> values = {redValue, greenValue, blueValue};
-    increment(values, immediate);
-}
-
-void LedWriter::save(bool global) {
+template <unsigned int N>
+void LedWriter<N>::save(bool global) {
     print("Saving");
     if (global) {
         this->globalSave->save(getCurrent());
@@ -313,14 +318,15 @@ void LedWriter::save(bool global) {
     print("Saved");
 }
 
-std::array<uint16_t, 3> LedWriter::recall(bool global, bool apply, bool immediate) {
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::recall(bool global, bool apply, bool immediate) {
     print("Recalling");
-    std::array<uint16_t, 3> recalled;
+    std::array<uint16_t, N> recalled;
     if (global) {
         recalled = this->globalSave->recall();
         this->globalSave->clear();
     } else {
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < N; ++i) {
             recalled[i] = this->channels[i]->recall();
         }
     }
@@ -331,65 +337,76 @@ std::array<uint16_t, 3> LedWriter::recall(bool global, bool apply, bool immediat
     return recalled;
 }
 
-std::array<uint16_t, 3> LedWriter::full(bool immediate) {
-    std::array<uint16_t, 3> values = {
-            this->channels[0]->maximum,
-            this->channels[1]->maximum,
-            this->channels[2]->maximum
-        };
-    set(values, immediate);
-    return values;
-}
-
-std::array<uint16_t, 3> LedWriter::clear(bool immediate) {
-    std::array<uint16_t, 3> values = {
-            this->channels[0]->minimum,
-            this->channels[1]->minimum,
-            this->channels[2]->minimum
-        };
-    set(values, immediate);
-    return values;
-}
-
-std::array<uint16_t, 3> LedWriter::primary(uint8_t channel, uint16_t value) {
-    value = (value ? value : this->channels[channel]->maximum);
-    std::array<uint16_t, 3> values;
-    for (int i = 0; i < 3; i++) {
-        values[i] = ((i == channel) ? value : this->channels[i]->minimum);
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::full(bool immediate) {
+    std::array<uint16_t, N> values;
+    for (int i = 0; i < N; ++i) {
+        values[i] = this->channels[i]->maximum;
     }
+    set(values, immediate);
     return values;
 }
 
-std::array<uint16_t, 3> LedWriter::secondary(uint8_t channel, uint16_t value) {
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::clear(bool immediate) {
+    std::array<uint16_t, N> values;
+    for (int i = 0; i < N; ++i) {
+        values[i] = this->channels[i]->minimum;
+    }
+    set(values, immediate);
+    return values;
+}
+
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::primary(uint8_t channel, uint16_t value) {
     value = (value ? value : this->channels[channel]->maximum);
-    std::array<uint16_t, 3> values = {
-            this->channels[0]->minimum,
-            this->channels[1]->minimum,
-            this->channels[2]->minimum
-        };
-    for (int i = 0, j = 1; i < 3; i++, j++) {
-        j = (j < 3 ? j : 0);
-        if (i == channel) {
-            values[i] = value;
-            values[j] = value;
+    std::array<uint16_t, N> values;
+    for (int i = 0; i < N; ++i) {
+        values[i] = this->channels[i]->minimum;
+    }
+    if (N >= 3)
+    {
+        for (int i = 0; i < 3; ++i) {
+            values[i] = ((i == channel) ? value : this->channels[i]->minimum);
         }
     }
     return values;
 }
 
-std::array<uint16_t, 3> LedWriter::getCurrent() {
-    std::array<uint16_t, 3> values = {
-            *(this->color[0]),
-            *(this->color[1]),
-            *(this->color[2])
-        };
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::secondary(uint8_t channel, uint16_t value) {
+    value = (value ? value : this->channels[channel]->maximum);
+    std::array<uint16_t, N> values;
+    for (int i = 0; i < N; ++i) {
+        values[i] = this->channels[i]->minimum;
+    }
+    if (N >= 3)
+    {
+        for (int i = 0, j = 1; i < 3; ++i, ++j) {
+            j = (j < 3 ? j : 0);
+            if (i == channel) {
+                values[i] = value;
+                values[j] = value;
+            }
+        }
+    }
     return values;
 }
 
-std::array<uint16_t, 3> LedWriter::getTarget() {
-    std::array<uint16_t, 3> values;
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::getCurrent() {
+    std::array<uint16_t, N> values;
+    for (int i = 0; i < N; ++i) {
+        values[i] = *(this->color[i]);
+    }
+    return values;
+}
+
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::getTarget() {
+    std::array<uint16_t, N> values;
     if (this->effect != nullptr) {
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < N; ++i) {
             values[i] = this->effect->target[i];
         }
     } else {
@@ -398,24 +415,27 @@ std::array<uint16_t, 3> LedWriter::getTarget() {
     return values;
 }
 
-std::array<uint16_t, 3> LedWriter::getColorInversion(std::array<uint16_t, 3> values) {
-    std::array<uint16_t, 3> inverted;
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::getColorInversion(std::array<uint16_t, N> values) {
+    std::array<uint16_t, N> inverted;
+    for (int i = 0; i < N; ++i) {
         inverted[i] = this->channels[i]->getColorInversion(values[i]);
     }
     return inverted;
 }
 
-std::array<uint16_t, 3> LedWriter::getColorInversion() {
-    std::array<uint16_t, 3> inverted;
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+std::array<uint16_t, N> LedWriter<N>::getColorInversion() {
+    std::array<uint16_t, N> inverted;
+    for (int i = 0; i < N; ++i) {
         inverted[i] = this->channels[i]->getColorInversion();
     }
     return inverted;
 }
 
-bool LedWriter::illuminated() {
-    // Whether any channel values are on
+template <unsigned int N>
+bool LedWriter<N>::illuminated() {
+    // Whether any channel is on
     for (auto color: this->color) {
         if (*color) {
             return true;
@@ -424,7 +444,8 @@ bool LedWriter::illuminated() {
     return false;
 }
 
-bool LedWriter::isMax(bool absolute) {
+template <unsigned int N>
+bool LedWriter<N>::isMax(bool absolute) {
     // Whether all channels are at maximum value
     for (auto channel: this->channels) {
         if (channel->value != (absolute ? channel->absoluteMaximum : channel->maximum)) {
@@ -434,7 +455,8 @@ bool LedWriter::isMax(bool absolute) {
     return true;
 }
 
-bool LedWriter::isMin() {
+template <unsigned int N>
+bool LedWriter<N>::isMin() {
     // Whether all channels are at minimum value
     for (auto channel: this->channels) {
         if (channel->value != channel->minimum) {
@@ -444,8 +466,9 @@ bool LedWriter::isMin() {
     return true;
 }
 
-bool LedWriter::isColor(std::array<uint16_t, 3> target) {
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+bool LedWriter<N>::isColor(std::array<uint16_t, N> target) {
+    for (int i = 0; i < N; ++i) {
         if (*(this->color[i]) != target[i]) {
             return false;
         }
@@ -453,24 +476,21 @@ bool LedWriter::isColor(std::array<uint16_t, 3> target) {
     return true;
 }
 
-bool LedWriter::isColor(uint16_t red, uint16_t green, uint16_t blue) {
-    std::array<uint16_t, 3> values = {red, green, blue};
-    return isColor(values);
-}
-
-void LedWriter::invert() {
+template <unsigned int N>
+void LedWriter<N>::invert() {
     print("Inverting current values");
     set(getColorInversion());
 }
 
-bool LedWriter::updateClock(uint32_t* currentTime, bool adjust) {
+template <unsigned int N>
+bool LedWriter<N>::updateClock(uint32_t* currentTime, bool adjust) {
     // Updates clock and returns whether a clock rollover has occured
     uint32_t before = this->now;
     if (currentTime != nullptr) {
         this->now = *currentTime;
         int64_t delta = (static_cast<int64_t>(this->now) - static_cast<int64_t>(before));
         if (adjust) {
-            // if (effectsQueued()) {
+            // if (ectsQueued()) {
             //     for (auto effect: this->effects) {
             //         effect->adjust(delta);
             //     }
@@ -493,19 +513,20 @@ bool LedWriter::updateClock(uint32_t* currentTime, bool adjust) {
     return ((this->now < before) && (!adjust));
 }
 
-uint32_t LedWriter::effectsQueued() {
+template <unsigned int N>
+uint32_t LedWriter<N>::effectsQueued() {
     return (this->effects.size());
 }
 
-bool LedWriter::effectsActive() {
+template <unsigned int N>
+bool LedWriter<N>::effectsActive() {
     return (effectsQueued() ? this->effect->active : false);
 }
 
-int LedWriter::looping() {
-    /*
-        If any effects are self-looping, returns the greatest number
-        of remaining loops. Returns -1 if found (indefinite).
-    */
+template <unsigned int N>
+int LedWriter<N>::looping() {
+    /* If any effects are self-looping, returns the greatest number
+    of remaining loops. Returns -1 if found (indefinite). */
     int loop = 0;
     if (effectsQueued()) {
         for (auto effect: this->effects) {
@@ -519,11 +540,13 @@ int LedWriter::looping() {
     return loop;
 }
 
-void LedWriter::skipEffect() {
+template <unsigned int N>
+void LedWriter<N>::skipEffect() {
     this->effect->cancel();
 }
 
-void LedWriter::updateEffects(std::array<uint16_t, 3> target) {
+template <unsigned int N>
+void LedWriter<N>::updateEffects(std::array<uint16_t, N> target) {
     for (auto effect: this->effects) {
         effect->target = target;
     }
@@ -531,15 +554,18 @@ void LedWriter::updateEffects(std::array<uint16_t, 3> target) {
     skipEffect();
 }
 
-Effect* LedWriter::nextEffect() {
+template <unsigned int N>
+Effect<N>* LedWriter<N>::nextEffect() {
     return (effectsQueued() ? this->effects.front() : nullptr);
 }
 
-Effect* LedWriter::lastEffect() {
+template <unsigned int N>
+Effect<N>* LedWriter<N>::lastEffect() {
     return (effectsQueued() ? this->effects.back() : nullptr);
 }
 
-void LedWriter::cycleEffects() {
+template <unsigned int N>
+void LedWriter<N>::cycleEffects() {
     if (this->effect != nullptr) {
         if (this->effect->complete() && !this->effect->active) {
             this->lastUID = this->effect->uid;
@@ -566,9 +592,6 @@ void LedWriter::cycleEffects() {
                 }
             }
             this->effects.erase(this->effects.begin());
-            if (this->effects.size() >= 10) {
-                this->effects.shrink_to_fit();
-            }
             this->effect = (effectsQueued() ? this->effects.front() : nullptr);
         } else {
             if (this->effect->run()) {
@@ -583,7 +606,8 @@ void LedWriter::cycleEffects() {
     }
 }
 
-void LedWriter::clearEffects(bool cancel) {
+template <unsigned int N>
+void LedWriter<N>::clearEffects(bool cancel) {
     print("Clearing effects");
     if (effectsQueued()) {
         int end = cancel ? 0 : 1;
@@ -606,11 +630,10 @@ void LedWriter::clearEffects(bool cancel) {
     print("Effects cleared");
 }
 
-void LedWriter::hold(double seconds, double timeIndex, bool all) {
-    /*
-        Holds active effect when fade is completed.
-        Creates an effect with current color if none are queued.
-    */
+template <unsigned int N>
+void LedWriter<N>::hold(double seconds, double timeIndex, bool all) {
+    /* Holds active effect when fade is completed.
+    Creates an effect with current color if none are queued. */
     if (effectsQueued()) {
         print("Setting hold on current effect");
         this->effects.front()->hold(seconds, timeIndex);
@@ -622,31 +645,32 @@ void LedWriter::hold(double seconds, double timeIndex, bool all) {
     }
 }
 
-void LedWriter::holdLast(double seconds, double timeIndex) {
-    /*
-        Holds active effect when fade is completed.
-        Creates an effect with current color if none are queued.
-    */
+template <unsigned int N>
+void LedWriter<N>::holdLast(double seconds, double timeIndex) {
+    /* Holds active effect when fade is completed.
+    Creates an effect with current color if none are queued. */
     if (effectsQueued()) {
         print("Setting hold on last queued effect");
         this->effects.back()->hold(seconds, timeIndex);
     }
 }
 
-void LedWriter::resume() {
+template <unsigned int N>
+void LedWriter<N>::resume() {
     // Resumes effect if one is active
     if (effectsQueued()) {
         this->effect->resume();
     }
 }
 
-bool LedWriter::bounceFlash(
-        std::array<uint16_t, 3> first, std::array<uint16_t, 3> second,
+template <unsigned int N>
+bool LedWriter<N>::bounceFlash(
+        std::array<uint16_t, N> first, std::array<uint16_t, N> second,
         double fadeDuration, double holdDuration
     ) {
     // Flashes between two colors when no effects are queued; non-blocking.
     if (!effectsQueued()) {
-        std::array<uint16_t, 3> target;
+        std::array<uint16_t, N> target;
         if (isColor(first)) {
             target = second;
         } else {
@@ -661,7 +685,8 @@ bool LedWriter::bounceFlash(
     return false;
 }
 
-bool LedWriter::bounce(double fadeDuration, double holdDuration) {
+template <unsigned int N>
+bool LedWriter<N>::bounce(double fadeDuration, double holdDuration) {
     // Inverts color when no effects are queued; non-blocking.
     if (!effectsQueued()) {
         if (!fadeDuration) {
@@ -676,10 +701,11 @@ bool LedWriter::bounce(double fadeDuration, double holdDuration) {
     return false;
 }
 
-bool LedWriter::blink(double fadeDuration, double holdDuration) {
+template <unsigned int N>
+bool LedWriter<N>::blink(double fadeDuration, double holdDuration) {
     // Clears or recalls color when no effects are queued; non-blocking.
     if (!effectsQueued()) {
-        std::array<uint16_t, 3> target;
+        std::array<uint16_t, N> target;
         if (!fadeDuration) {
             fadeDuration = this->globalEffectDuration;
         }
@@ -698,7 +724,8 @@ bool LedWriter::blink(double fadeDuration, double holdDuration) {
     return false;
 }
 
-void LedWriter::rotate(double duration) {
+template <unsigned int N>
+void LedWriter<N>::rotate(double duration) {
     // Cycles RYGCBM once; non-blocking.  Duration sets length of one full cycle.
     double divided = (duration ? duration : this->globalEffectDuration) / 6;
     for (int i = 0, j = 0; i < 3; i++, j += 2) {
@@ -707,14 +734,16 @@ void LedWriter::rotate(double duration) {
     }
 }
 
-void LedWriter::cycle(double duration) {
+template <unsigned int N>
+void LedWriter<N>::cycle(double duration) {
     // Cycles RYGCBMW when no effects are queued; non-blocking.
     if (!effectsQueued()) {
         rotate(duration);
     }
 }
 
-void LedWriter::test(double duration) {
+template <unsigned int N>
+void LedWriter<N>::test(double duration) {
     /*
         Immediately cycles RYGCBMW once and outputs a message
         over serial connection.
@@ -723,15 +752,16 @@ void LedWriter::test(double duration) {
     clearEffects();
     save(true);
     rotate(duration);
-    Effect* last = lastEffect();
+    Effect<N>* last = lastEffect();
     this->globalSave->enable(last->uid - 5, last->uid);
     print("Remote test successful");
 }
 
-void LedWriter::status() {
+template <unsigned int N>
+void LedWriter<N>::status() {
     // Prints various member variables to serial console for inspection and comparison.
     if (this->verbose) {
-        std::array<uint16_t, 3> current = getCurrent();
+        std::array<uint16_t, N> current = getCurrent();
         bool active = false;
         if (this->effect != nullptr) {
             active = (this->effect->active);
@@ -741,7 +771,14 @@ void LedWriter::status() {
             queueSize += sizeof(*effect);
         }
         Serial.printf("Current Time: %u\t", this->now);
-        Serial.printf("Current: R: %u G: %u B: %u\n", current[0], current[1], current[2]);
+        if (N >= 3)
+        {
+            Serial.printf("Current: R: %u G: %u B: %u", current[0], current[1], current[2]);
+        }
+        if (N >= 4) {
+            Serial.printf(" W: %u\n", current[3]);
+        }
+        Serial.printf("\n");
         Serial.printf("Effects: Queued: %u\tMemory consumed: %u\t", effectsQueued(), queueSize);
         Serial.printf("Active: %s\t", (active ? "True" : "False"));
         Serial.printf("Global duration: %f\n", this->globalEffectDuration);
@@ -761,7 +798,8 @@ void LedWriter::status() {
     }
 }
 
-void LedWriter::run() {
+template <unsigned int N>
+void LedWriter<N>::run() {
     /*
         Required for processing fades; reference this from loop(); i.e.,
         any value set without explicitly specifying immediate application
@@ -771,9 +809,10 @@ void LedWriter::run() {
     cycleEffects();
 }
 
+template <int N=3>
 void loop(void* parameter) {
     // Loop for threaded operation
-    LedWriter* instance = static_cast<LedWriter*>(parameter);
+    LedWriter<N>* instance = static_cast<LedWriter<N>*>(parameter);
     while (true) {
         instance->run();
         #if ESP32
@@ -784,7 +823,8 @@ void loop(void* parameter) {
     }
 }
 
-void LedWriter::startTasks() {
+template <unsigned int N>
+void LedWriter<N>::startTasks() {
     print("Starting run task");
     #if ESP32
         xTaskCreatePinnedToCore(loop, "runner", 40000, this, 1, NULL, 1);

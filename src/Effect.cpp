@@ -99,9 +99,10 @@ bool Hold::step(uint32_t stepsRemaining) {
     return this->active;
 }
 
-Effect::Effect(
-        std::array<uint16_t, 3> target,
-        std::array<ColorChannel*, 3>* channels,
+template <unsigned int N>
+Effect<N>::Effect(
+        std::array<uint16_t, N> target,
+        std::array<ColorChannel*, N>* channels,
         uint32_t* now,
         double duration,
         bool recall,
@@ -113,7 +114,7 @@ Effect::Effect(
     ) {
     this->channels = channels;
     this->recall = recall;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < N; ++i) {
         this->current[i] = (*this->channels)[i]->color;
         this->target[i] = (*this->channels)[i]->conform(target[i]);
         if (this->recall) {
@@ -132,7 +133,8 @@ Effect::Effect(
     defer();
 }
 
-Effect::~Effect() {
+template <unsigned int N>
+Effect<N>::~Effect() {
     if (this->recall) {
         for (auto channel: *this->channels) {
             channel->recall(true);
@@ -149,7 +151,8 @@ Effect::~Effect() {
     this->channels = nullptr;
 }
 
-bool Effect::complete() {
+template <unsigned int N>
+bool Effect<N>::complete() {
     if (this->aborted) {
         return true;
     } else if (!this->holds.empty()) {
@@ -158,8 +161,9 @@ bool Effect::complete() {
     return targetReached();
 }
 
-bool Effect::targetReached() {
-    for (int i = 0; i < 3; i++) {
+template <unsigned int N>
+bool Effect<N>::targetReached() {
+    for (int i = 0; i < N; ++i) {
         if ((*this->channels)[i]->get() != this->target[i]) {
             return false;
         }
@@ -167,12 +171,14 @@ bool Effect::targetReached() {
     return true;
 }
 
-void Effect::cancel() {
+template <unsigned int N>
+void Effect<N>::cancel() {
     this->aborted = true;
     this->active = true;
 }
 
-uint32_t Effect::secondsToMicroseconds(double seconds) {
+template <unsigned int N>
+uint32_t Effect<N>::secondsToMicroseconds(double seconds) {
     if (seconds < 0) {
         seconds = 0; // Minimum zero
     } else if (seconds > 4294967295) {
@@ -181,13 +187,15 @@ uint32_t Effect::secondsToMicroseconds(double seconds) {
     return (seconds * 1000000);
 }
 
-void Effect::setDuration(double seconds) {
+template <unsigned int N>
+void Effect<N>::setDuration(double seconds) {
     uint32_t microseconds = secondsToMicroseconds(seconds);
     // Minimum duration 1 microsecond
     this->duration = (microseconds ? microseconds : 1);
 }
 
-void Effect::defer() {
+template <unsigned int N>
+void Effect<N>::defer() {
     // Defer start if effect spans clock rollover
     if (this->deferOnRollover && (this->end < this->start)) {
         this->start = 1;
@@ -195,7 +203,8 @@ void Effect::defer() {
     }
 }
 
-void Effect::adjust(int64_t delta) {
+template <unsigned int N>
+void Effect<N>::adjust(int64_t delta) {
     // Adjust time points for clock synchronization
     if (!this->active) {
         this->start += delta;
@@ -205,7 +214,8 @@ void Effect::adjust(int64_t delta) {
     defer();
 }
 
-void Effect::updateTimers(double duration, uint32_t absoluteStart) {
+template <unsigned int N>
+void Effect<N>::updateTimers(double duration, uint32_t absoluteStart) {
     if (this->active) {
         return;
     }
@@ -213,7 +223,8 @@ void Effect::updateTimers(double duration, uint32_t absoluteStart) {
     this->start = absoluteStart;
 }
 
-int16_t Effect::vary(int32_t boundary, uint32_t& var) {
+template <unsigned int N>
+int16_t Effect<N>::vary(int32_t boundary, uint32_t& var) {
     if (!boundary) {
         return 0;
     }
@@ -227,16 +238,19 @@ int16_t Effect::vary(int32_t boundary, uint32_t& var) {
     return variance;
 }
 
-void Effect::varyStart(int32_t boundary) {
+template <unsigned int N>
+void Effect<N>::varyStart(int32_t boundary) {
     this->end += vary(boundary, this->start);
 }
 
-void Effect::varyDuration(int32_t boundary) {
+template <unsigned int N>
+void Effect<N>::varyDuration(int32_t boundary) {
     vary(boundary, this->duration);
     this->end = this->start + this->duration;
 }
 
-void Effect::hold(double durationInSeconds, double timeIndex) {
+template <unsigned int N>
+void Effect<N>::hold(double durationInSeconds, double timeIndex) {
     // Sets a hold in seconds that starts at timeIndex (0 - 1 effect completion)
     if (ESP.getFreeHeap() < 32768) {
         print("\tInsufficient memory for hold creation");
@@ -247,7 +261,8 @@ void Effect::hold(double durationInSeconds, double timeIndex) {
     this->holds.push_back(created);
 }
 
-void Effect::resume() {
+template <unsigned int N>
+void Effect<N>::resume() {
     // Cancel current hold
     if (!this->holds.empty()) {
         delete this->holds.front();
@@ -255,13 +270,15 @@ void Effect::resume() {
     }
 }
 
-void Effect::clearHolds() {
+template <unsigned int N>
+void Effect<N>::clearHolds() {
     print("\tClearing holds");
     if (!this->holds.empty() || !this->secondaryHolds.empty()) {
-        for (int i = 0; i < this->holds.size(); i++) {
+        int holdsSize(this->holds.size()), secondaryHoldsSize(this->secondaryHolds.size());
+        for (int i = 0; i < holdsSize; i++) {
             delete this->holds[i];
         }
-        for (int i = 0; i < this->secondaryHolds.size(); i++) {
+        for (int i = 0; i < secondaryHoldsSize; i++) {
             delete this->secondaryHolds[i];
         }
         this->holds.clear();
@@ -270,7 +287,8 @@ void Effect::clearHolds() {
     print("\tHolds cleared");
 }
 
-void Effect::activate() {
+template <unsigned int N>
+void Effect<N>::activate() {
     if (this->verbose) {
         Serial.printf(
                 "\tActivating effect UID %u with start time %u at %u\n",
@@ -278,7 +296,7 @@ void Effect::activate() {
             );
     }
     this->active = true;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < N; ++i) {
         (*this->channels)[i]->setTarget(this->target[i]);
     }
     if (!getSteps()) {
@@ -313,7 +331,8 @@ void Effect::activate() {
     }
 }
 
-uint32_t Effect::getSteps() {
+template <unsigned int N>
+uint32_t Effect<N>::getSteps() {
     for (auto channel: *this->channels) {
         channel->getDelta();
         if (channel->delta > this->stepsRemaining) {
@@ -326,7 +345,8 @@ uint32_t Effect::getSteps() {
     return this->stepsRemaining;
 }
 
-bool Effect::holding() {
+template <unsigned int N>
+bool Effect<N>::holding() {
     // Process holds and return whether a hold is active
     if (!this->holds.empty()) {
         Hold* current = this->holds.front();
@@ -351,7 +371,8 @@ bool Effect::holding() {
     return false;
 }
 
-void Effect::step() {
+template <unsigned int N>
+void Effect<N>::step() {
     // Measures elapsed time and compensates
     uint32_t elapsed = micros() - this->last;
     if (elapsed && !holding() && (this->stepsRemaining > 0)) {
@@ -377,7 +398,8 @@ void Effect::step() {
     }
 }
 
-bool Effect::run() {
+template <unsigned int N>
+bool Effect<N>::run() {
     /* Main loop for Effects;
     returns true upon activation (not while stepping). */
     if (this->active && complete()) {
@@ -395,7 +417,8 @@ bool Effect::run() {
     return false;
 }
 
-void Effect::status() {
+template <unsigned int N>
+void Effect<N>::status() {
     if (this->verbose) {
         Serial.printf("Effect status:\n");
         Serial.printf(

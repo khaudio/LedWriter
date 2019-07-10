@@ -1,6 +1,6 @@
 #include "LedWriter.h"
 
-LedWriter writer(15, 13, 12); // RGB output pins and default resolution
+LedWriter<3> writer(15, 13, 12); // RGB output pins and default resolution
 
 void setup() {}
 

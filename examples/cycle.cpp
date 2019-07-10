@@ -2,7 +2,7 @@
 
 // Endlessly cycles RYGCBM every 3 seconds
 
-LedWriter writer(
+LedWriter<3> writer(
         15, // Red output pin
         13, // Green output pin
         12, // Blue output pin
