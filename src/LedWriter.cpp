@@ -749,20 +749,31 @@ bool LedWriter<N>::blink(double fadeDuration, double holdDuration) {
 }
 
 template <unsigned int N>
-void LedWriter<N>::rotate(double duration) {
-    // Cycles RYGCBM once; non-blocking.  Duration sets length of one full cycle.
-    double divided = (duration ? duration : this->globalEffectDuration) / 6;
+void LedWriter<N>::rotate(double duration, bool white) {
+    /* Cycles RYGCBM or RYGCBMW once; non-blocking.
+    Duration sets length of one full cycle. */
+    double divided = (duration ? duration : this->globalEffectDuration) / (white ? 7 : 6);
     for (int i = 0, j = 0; i < 3; ++i, j += 2) {
         createEffect(primary(i), divided, false, 0, 0, 0, j, false, 0);
         createEffect(secondary(i), divided,  false, 0, 0, 0, j + 1, false, 0);
     }
+    if (white && (N > 3)) {
+        std::array<uint16_t, N> whiteValues;
+        int colorIndex = N - 2;
+        for (int i = 0; i < colorIndex; ++i)
+        {
+            whiteValues[i] = 0;
+        }
+        whiteValues[N - 1] = this->channels[N - 1]->maximum;
+        createEffect(whiteValues, .25, false, 0, 0, 0, 6, false, 0);
+    }
 }
 
 template <unsigned int N>
-void LedWriter<N>::cycle(double duration) {
+void LedWriter<N>::cycle(double duration, bool white) {
     // Cycles RYGCBMW when no effects are queued; non-blocking.
     if (!effectsQueued()) {
-        rotate(duration);
+        rotate(duration, white);
     }
 }
 
@@ -777,7 +788,10 @@ void LedWriter<N>::test(double duration) {
     save(true);
     rotate(duration);
     Effect<N>* last = lastEffect();
-    this->globalSave->enable(last->uid - 5, last->uid);
+    // this->globalSave->enable(last->uid - 5, last->uid);
+    this->globalSave->enabled = true;
+    this->globalSave->saveUID = last->uid - 5;
+    this->globalSave->recallUID = last->uid;
     print("Remote test successful");
 }
 
@@ -800,7 +814,7 @@ void LedWriter<N>::status() {
             Serial.printf("Current: R: %u G: %u B: %u", current[0], current[1], current[2]);
         }
         if (N >= 4) {
-            Serial.printf(" W: %u\n", current[3]);
+            Serial.printf(" W: %u", current[3]);
         }
         Serial.printf("\n");
         Serial.printf("Effects: Queued: %u\tMemory consumed: %u\t", effectsQueued(), queueSize);

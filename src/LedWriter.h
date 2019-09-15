@@ -38,7 +38,7 @@
 #define MAX_EFFECTS     1000
 #define USE_TASKS       false
 
-template <unsigned int N=3>
+template <unsigned int N=4>
 class GlobalSave {
     public:
         bool enabled = false;
@@ -52,7 +52,7 @@ class GlobalSave {
         bool saveInquiry(uint32_t);
 };
 
-template <unsigned int N=3>
+template <unsigned int N=4>
 class LedWriter : public SimpleSerialBase {
     public:
         std::array<ColorChannel*, N> channels;
@@ -68,13 +68,6 @@ class LedWriter : public SimpleSerialBase {
         LedWriter(std::array<uint8_t, N>, uint8_t=10, bool=true);
         LedWriter(uint8_t=10, bool=true);
         void init(std::array<uint8_t, N>, uint8_t=10, bool=true);
-        // LedWriter(
-        //         uint8_t redPin=15,
-        //         uint8_t greenPin=13,
-        //         uint8_t bluePin=12,
-        //         uint8_t resolution=10,
-        //         bool on=true
-        //     );
         ~LedWriter();
         void setPolarityInversion(bool);
         void setScale(std::array<double, N>);
@@ -137,8 +130,8 @@ class LedWriter : public SimpleSerialBase {
             );
         bool bounce(double fadeDuration=0, double holdDuration=0);
         bool blink(double fadeDuration=0, double holdDuration=0);
-        void rotate(double duration=0);
-        void cycle(double duration=0);
+        void rotate(double duration=0, bool=false);
+        void cycle(double duration=0, bool=false);
         void test(double duration=1.5);
         void status();
         void run();
@@ -148,10 +141,14 @@ class LedWriter : public SimpleSerialBase {
 
 #endif
 
+template class GlobalSave<1>;
+template class GlobalSave<2>;
+template class GlobalSave<3>;
+template class GlobalSave<4>;
+template class GlobalSave<5>;
+
 template class LedWriter<1>;
 template class LedWriter<2>;
 template class LedWriter<3>;
 template class LedWriter<4>;
 template class LedWriter<5>;
-
-// #include "LedWriter.cpp"
